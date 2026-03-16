@@ -3,9 +3,10 @@ import yt_dlp
 import os
 import tempfile
 
-# Page Branding & UI
+# 1. Page Configuration
 st.set_page_config(page_title="One Pilot Social Downloader", page_icon="🚀", layout="wide")
 
+# 2. Custom White UI Styling
 st.markdown("""
     <style>
     .main { background-color: #ffffff; }
@@ -18,60 +19,83 @@ st.markdown("""
         font-weight: bold;
         border: none;
     }
+    .stButton>button:hover { background-color: #cc0000; border: none; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🚀 Social Media Video Downloader")
-st.write("Bahi, apna pasandida video link paste karen aur download button dabayein.")
+st.title("🚀 One Pilot Social Downloader")
+st.write("YouTube, Shorts, Instagram ya Facebook ka link paste karen.")
 
-# Input Section
-url = st.text_input("Enter Video Link (YouTube, Shorts, etc.):", placeholder="https://www.youtube.com/...")
-quality_choice = st.selectbox("Video Quality Select Karen:", ["Best Quality", "720p (HD)", "360p (Fast)"])
+# 3. User Inputs
+url = st.text_input("Paste Video Link Here:", placeholder="https://www.youtube.com/...")
+option = st.selectbox("Download Type & Quality:", [
+    "Video - Best Quality", 
+    "Video - 720p (HD)", 
+    "Video - 360p (Fast)",
+    "Audio Only (MP3)"
+])
 
-if st.button("GET VIDEO"):
+if st.button("GET FILE"):
     if url:
         try:
-            with st.spinner("Bahi wait karen, video process ho rahi hai..."):
+            with st.spinner("Bahi process ho raha hai, thora intezar karen..."):
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     
-                    # Quality Logic
-                    format_opt = 'best'
-                    if quality_choice == "720p (HD)":
-                        format_opt = 'best[height<=720]'
-                    elif quality_choice == "360p (Fast)":
-                        format_opt = 'best[height<=360]'
+                    # 4. Flexible Format Logic
+                    if option == "Video - 720p (HD)":
+                        format_opt = 'bestvideo[height<=720]+bestaudio/best[height<=720]/best'
+                    elif option == "Video - 360p (Fast)":
+                        format_opt = 'bestvideo[height<=360]+bestaudio/best[height<=360]/best'
+                    elif option == "Audio Only (MP3)":
+                        format_opt = 'bestaudio/best'
+                    else:
+                        format_opt = 'bestvideo+bestaudio/best'
 
-                    # YT-DLP Options with Anti-Block
+                    # 5. Advanced Options with Anti-Block & Cookies
                     ydl_opts = {
                         'format': format_opt,
                         'outtmpl': f'{tmp_dir}/%(title)s.%(ext)s',
                         'quiet': True,
                         'no_warnings': True,
+                        'nocheckcertificate': True,
                         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
                         'referer': 'https://www.google.com/',
+                        'merge_output_format': 'mp4' if "Video" in option else None,
                     }
 
-                    # Check if cookies file exists
+                    # Post-processor for MP3
+                    if option == "Audio Only (MP3)":
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+
+                    # Check for cookies.txt
                     if os.path.exists("cookies.txt"):
                         ydl_opts['cookiefile'] = 'cookies.txt'
 
+                    # 6. Execution
                     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                         info = ydl.extract_info(url, download=True)
-                        video_title = info.get('title', 'Social_Video')
                         file_path = ydl.prepare_filename(info)
+                        
+                        # Audio extension fix
+                        if option == "Audio Only (MP3)":
+                            file_path = os.path.splitext(file_path)[0] + ".mp3"
 
+                        # 7. Final Download Button
                         with open(file_path, "rb") as f:
-                            st.success(f"✅ Tayyar hai: {video_title}")
+                            st.success(f"✅ Ready: {info.get('title', 'File')}")
                             st.download_button(
-                                label="📥 DOWNLOAD NOW",
+                                label="📥 CLICK TO DOWNLOAD NOW",
                                 data=f,
                                 file_name=os.path.basename(file_path),
-                                mime="video/mp4"
+                                mime="video/mp4" if "Video" in option else "audio/mpeg"
                             )
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
-            if "403" in str(e):
-                st.info("Bahi, lagta hai YouTube ne block kiya hai. 'cookies.txt' file GitHub par upload karna lazmi hai.")
+            st.info("Bahi, agar error aye toh check karen link sahi hai ya 'cookies.txt' updated hai.")
     else:
         st.warning("Pehle link toh dalen bahi!")
 
